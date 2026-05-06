@@ -438,7 +438,7 @@ function ChatPage() {
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-white/35 animate-pulse" />
-            <span className="text-[10px] font-mono text-white/25">YAPPERTAR-ai-120b</span>
+            <span className="text-[10px] font-mono text-white/25">OxiwisAI</span>
           </div>
         </div>
 
