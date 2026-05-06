@@ -4,52 +4,44 @@
 
 @layer base {
   :root {
-    --background: 0 0% 4%;
-    --foreground: 220 20% 92%;
+    --background: 0 0% 3%;
+    --foreground: 0 0% 90%;
 
-    --card: 220 15% 7%;
-    --card-foreground: 220 20% 92%;
+    --card: 0 0% 6%;
+    --card-foreground: 0 0% 90%;
 
-    --popover: 220 15% 7%;
-    --popover-foreground: 220 20% 92%;
+    --popover: 0 0% 6%;
+    --popover-foreground: 0 0% 90%;
 
-    --primary: 220 100% 60%;
-    --primary-foreground: 0 0% 4%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 0 0% 5%;
 
-    --secondary: 270 80% 60%;
-    --secondary-foreground: 0 0% 4%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 80%;
 
-    --muted: 220 15% 12%;
-    --muted-foreground: 220 15% 50%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 0 0% 45%;
 
-    --accent: 200 100% 55%;
-    --accent-foreground: 0 0% 4%;
+    --accent: 220 15% 85%;
+    --accent-foreground: 0 0% 5%;
 
-    --destructive: 0 80% 55%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 60% 45%;
+    --destructive-foreground: 0 0% 95%;
 
-    --border: 220 15% 14%;
-    --input: 220 15% 10%;
-    --ring: 220 100% 60%;
+    --border: 0 0% 12%;
+    --input: 0 0% 8%;
+    --ring: 0 0% 60%;
 
-    --radius: 0.375rem;
+    --radius: 0.5rem;
 
-    --neon-blue: #3b82f6;
-    --neon-violet: #8b5cf6;
-    --neon-cyan: #06b6d4;
-    --neon-glow-blue:
-      0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.2);
-    --neon-glow-violet:
-      0 0 20px rgba(139, 92, 246, 0.5), 0 0 40px rgba(139, 92, 246, 0.2);
-
-    --sidebar-background: 220 15% 6%;
-    --sidebar-foreground: 220 15% 75%;
-    --sidebar-primary: 220 100% 60%;
-    --sidebar-primary-foreground: 0 0% 4%;
-    --sidebar-accent: 220 15% 10%;
-    --sidebar-accent-foreground: 220 20% 92%;
-    --sidebar-border: 220 15% 12%;
-    --sidebar-ring: 220 100% 60%;
+    --sidebar-background: 0 0% 4%;
+    --sidebar-foreground: 0 0% 65%;
+    --sidebar-primary: 0 0% 88%;
+    --sidebar-primary-foreground: 0 0% 5%;
+    --sidebar-accent: 0 0% 9%;
+    --sidebar-accent-foreground: 0 0% 88%;
+    --sidebar-border: 0 0% 10%;
+    --sidebar-ring: 0 0% 60%;
   }
 }
 
@@ -62,180 +54,160 @@
     @apply bg-background text-foreground font-golos;
     background-image:
       radial-gradient(
-        ellipse 80% 50% at 20% 10%,
-        rgba(59, 130, 246, 0.06) 0%,
-        transparent 60%
+        ellipse 70% 50% at 15% 0%,
+        rgba(180, 200, 255, 0.035) 0%,
+        transparent 55%
       ),
       radial-gradient(
-        ellipse 60% 40% at 80% 80%,
-        rgba(139, 92, 246, 0.05) 0%,
-        transparent 60%
+        ellipse 50% 40% at 85% 100%,
+        rgba(150, 170, 220, 0.025) 0%,
+        transparent 50%
       );
   }
 
   ::-webkit-scrollbar {
-    width: 4px;
+    width: 3px;
   }
-
   ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+    background: transparent;
   }
-
   ::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 2px;
   }
-
   ::-webkit-scrollbar-thumb:hover {
-    background: var(--neon-blue);
+    background: hsl(0 0% 22%);
   }
 }
 
 @layer components {
-  .scanlines {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .scanlines::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.03) 2px,
-      rgba(0, 0, 0, 0.03) 4px
-    );
-    pointer-events: none;
-    z-index: 1;
-  }
-
-  .neon-border-blue {
-    border: 1px solid rgba(59, 130, 246, 0.4);
-    box-shadow:
-      0 0 15px rgba(59, 130, 246, 0.1),
-      inset 0 0 15px rgba(59, 130, 246, 0.03);
-  }
-
-  .neon-border-violet {
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    box-shadow:
-      0 0 15px rgba(139, 92, 246, 0.1),
-      inset 0 0 15px rgba(139, 92, 246, 0.03);
-  }
-
-  .neon-text-blue {
-    color: var(--neon-blue);
-    text-shadow:
-      0 0 10px rgba(59, 130, 246, 0.8),
-      0 0 20px rgba(59, 130, 246, 0.4);
-  }
-
-  .neon-text-violet {
-    color: var(--neon-violet);
-    text-shadow:
-      0 0 10px rgba(139, 92, 246, 0.8),
-      0 0 20px rgba(139, 92, 246, 0.4);
-  }
-
-  .glass-card {
+  .glass {
     background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+  .glass-hover {
+    transition:
+      border-color 0.2s,
+      background 0.2s;
+  }
+  .glass-hover:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .grid-bg {
     background-image:
-      linear-gradient(rgba(59, 130, 246, 0.05) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(59, 130, 246, 0.05) 1px, transparent 1px);
-    background-size: 40px 40px;
+      linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
   }
 
-  .glitch {
-    position: relative;
+  .logo-glow {
+    filter: drop-shadow(0 0 14px rgba(180, 210, 255, 0.65))
+      drop-shadow(0 0 35px rgba(140, 180, 255, 0.2));
   }
 
-  .glitch::before,
-  .glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-  }
-
-  .glitch::before {
-    animation: glitch-1 3s infinite;
-    color: var(--neon-blue);
-    clip-path: polygon(0 0, 100% 0, 100% 35%, 0 35%);
-    opacity: 0.6;
-  }
-
-  .glitch::after {
-    animation: glitch-2 3s infinite;
-    color: var(--neon-violet);
-    clip-path: polygon(0 65%, 100% 65%, 100% 100%, 0 100%);
-    opacity: 0.6;
-  }
-
-  .token-bar {
-    background: linear-gradient(90deg, var(--neon-blue), var(--neon-violet));
-    border-radius: 2px;
-    transition: width 0.5s ease;
+  .text-gradient {
+    background: linear-gradient(135deg, #ffffff 0%, #c8d8f0 45%, #ffffff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .code-block {
     font-family: "IBM Plex Mono", monospace;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid rgba(59, 130, 246, 0.2);
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 0.5rem;
-    position: relative;
   }
 
-  .typing-cursor::after {
-    content: "▋";
-    animation: blink 1s infinite;
-    color: var(--neon-blue);
+  .token-bar {
+    background: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.55),
+      rgba(190, 215, 255, 0.4)
+    );
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  .badge-mono {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.38);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .btn-primary {
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    background: rgba(255, 255, 255, 0.9);
+    color: #080808;
+    border: none;
+    cursor: pointer;
+  }
+  .btn-primary:hover {
+    background: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(255, 255, 255, 0.09);
+  }
+
+  .btn-ghost {
+    padding: 0.625rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+  }
+  .btn-ghost:hover {
+    color: rgba(255, 255, 255, 0.88);
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.04);
   }
 }
 
-@keyframes glitch-1 {
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes float {
   0%,
-  85%,
   100% {
-    transform: translateX(0);
+    transform: translateY(0);
   }
-  87% {
-    transform: translateX(-2px);
-  }
-  90% {
-    transform: translateX(2px);
-  }
-  93% {
-    transform: translateX(0);
+  50% {
+    transform: translateY(-6px);
   }
 }
-
-@keyframes glitch-2 {
-  0%,
-  85%,
-  100% {
-    transform: translateX(0);
-  }
-  88% {
-    transform: translateX(2px);
-  }
-  91% {
-    transform: translateX(-2px);
-  }
-  94% {
-    transform: translateX(0);
-  }
-}
-
 @keyframes blink {
   0%,
   49% {
@@ -246,74 +218,35 @@
     opacity: 0;
   }
 }
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px);
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.1);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
   }
-}
-
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse-neon {
-  0%,
   100% {
-    box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
-  }
-  50% {
-    box-shadow:
-      0 0 25px rgba(59, 130, 246, 0.7),
-      0 0 50px rgba(59, 130, 246, 0.3);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
   }
 }
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(20px);
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
   }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes float {
-  0%,
   100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-8px);
+    background-position: 200% center;
   }
 }
 
 .animate-fade-in {
-  animation: fade-in 0.4s ease forwards;
+  animation: fade-in 0.35s ease forwards;
 }
-.animate-fade-in-up {
-  animation: fade-in-up 0.6s ease forwards;
-}
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease forwards;
-}
-.animate-pulse-neon {
-  animation: pulse-neon 2s ease-in-out infinite;
+.animate-fade-up {
+  animation: fade-up 0.55s ease forwards;
 }
 .animate-float {
-  animation: float 4s ease-in-out infinite;
+  animation: float 5s ease-in-out infinite;
+}
+.animate-pulse-ring {
+  animation: pulse-ring 2.5s ease infinite;
 }

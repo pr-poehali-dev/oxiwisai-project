@@ -3,13 +3,14 @@ import Icon from "@/components/ui/icon";
 
 type Page = "home" | "chat" | "docs" | "about" | "admin";
 
+// ─── ТИПЫ ──────────────────────────────────────────────────────────────────
+
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   tokens: number;
   timestamp: Date;
-  hasCode?: boolean;
 }
 
 interface ChatSession {
@@ -19,59 +20,59 @@ interface ChatSession {
   createdAt: Date;
 }
 
-const CODE_KEYWORDS = ["напиши код", "покажи код", "пример кода", "функцию", "скрипт", "написать функцию", "код на", "реализуй", "создай функцию", "write code", "code example"];
+// ─── УТИЛИТЫ ───────────────────────────────────────────────────────────────
 
-function detectCodeRequest(text: string): boolean {
-  return CODE_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
+const LOGO_URL = "https://cdn.poehali.dev/projects/8a4d2a14-ee20-46d1-b541-1aa2658b7e31/bucket/6e6ff456-2077-493f-8813-224ed69f6d4a.jpg";
+const DAILY_LIMIT = 256;
+
+function getMsUntilMidnightMsk(): number {
+  const now = new Date();
+  const msk = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
+  const next = new Date(msk);
+  next.setHours(24, 0, 0, 0);
+  return next.getTime() - msk.getTime();
 }
 
-function extractLanguage(text: string): string {
-  if (text.toLowerCase().includes("python")) return "python";
-  if (text.toLowerCase().includes("javascript") || text.toLowerCase().includes("js")) return "javascript";
-  if (text.toLowerCase().includes("typescript") || text.toLowerCase().includes("ts")) return "typescript";
-  if (text.toLowerCase().includes("css")) return "css";
-  if (text.toLowerCase().includes("html")) return "html";
-  if (text.toLowerCase().includes("sql")) return "sql";
-  if (text.toLowerCase().includes("bash") || text.toLowerCase().includes("shell")) return "bash";
-  return "javascript";
+function formatCountdown(ms: number): string {
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  const s = Math.floor((ms % 60_000) / 1_000);
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function generateCodeResponse(userMsg: string): { text: string; code: string; lang: string } {
-  const lang = extractLanguage(userMsg);
-  const codeExamples: Record<string, string> = {
-    python: `def process_data(items: list) -> dict:
-    """Обработка данных с агрегацией результатов."""
-    result = {}
+const CODE_KEYWORDS = [
+  "напиши код", "покажи код", "пример кода", "функцию", "скрипт",
+  "написать функцию", "код на", "реализуй", "создай функцию",
+  "write code", "code example", "пример на",
+];
+
+function detectCode(text: string) {
+  return CODE_KEYWORDS.some(k => text.toLowerCase().includes(k));
+}
+
+function detectLang(text: string) {
+  if (/python/i.test(text)) return "python";
+  if (/typescript|\.ts/i.test(text)) return "typescript";
+  if (/javascript|\.js/i.test(text)) return "javascript";
+  if (/sql/i.test(text)) return "sql";
+  if (/bash|shell/i.test(text)) return "bash";
+  return "python";
+}
+
+const CODE_EXAMPLES: Record<string, string> = {
+  python: `def process_data(items: list[dict]) -> dict:
+    """Обработка и агрегация данных."""
+    result: dict[str, int] = {}
     for item in items:
         key = item.get("type", "unknown")
         result[key] = result.get(key, 0) + item.get("value", 0)
     return result
 
-# Пример использования
-data = [
-    {"type": "alpha", "value": 42},
-    {"type": "beta", "value": 17},
-    {"type": "alpha", "value": 8},
-]
-output = process_data(data)
-print(output)  # {'alpha': 50, 'beta': 17}`,
-    javascript: `async function fetchWithRetry(url, options = {}, retries = 3) {
-  for (let attempt = 0; attempt < retries; attempt++) {
-    try {
-      const response = await fetch(url, options);
-      if (!response.ok) throw new Error(\`HTTP \${response.status}\`);
-      return await response.json();
-    } catch (error) {
-      if (attempt === retries - 1) throw error;
-      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-    }
-  }
-}
+# Использование
+data = [{"type": "alpha", "value": 42}, {"type": "beta", "value": 17}]
+print(process_data(data))  # {'alpha': 42, 'beta': 17}`,
 
-// Пример использования
-const data = await fetchWithRetry('https://api.example.com/data');
-console.log(data);`,
-    typescript: `interface ApiResponse<T> {
+  typescript: `interface ApiResponse<T> {
   data: T;
   status: number;
   message: string;
@@ -79,104 +80,88 @@ console.log(data);`,
 
 async function apiCall<T>(
   endpoint: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  body?: unknown
+  method: "GET" | "POST" = "GET",
+  body?: unknown,
 ): Promise<ApiResponse<T>> {
-  const response = await fetch(endpoint, {
+  const res = await fetch(endpoint, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : undefined,
   });
-  
-  if (!response.ok) {
-    throw new Error(\`API Error: \${response.status}\`);
-  }
-  
-  return response.json();
+  if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+  return res.json();
 }`,
-    sql: `-- Запрос с агрегацией и оконными функциями
-SELECT
+
+  javascript: `async function fetchWithRetry(url, options = {}, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
+      return await res.json();
+    } catch (err) {
+      if (i === retries - 1) throw err;
+      await new Promise(r => setTimeout(r, 800 * (i + 1)));
+    }
+  }
+}`,
+
+  sql: `SELECT
   user_id,
-  session_date,
-  tokens_used,
   SUM(tokens_used) OVER (
     PARTITION BY user_id
-    ORDER BY session_date
+    ORDER BY created_at
     ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
   ) AS cumulative_tokens,
   AVG(tokens_used) OVER (
     PARTITION BY user_id
-    ORDER BY session_date
+    ORDER BY created_at
     ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
-  ) AS rolling_avg_7d
+  ) AS rolling_7d
 FROM api_sessions
-WHERE session_date >= NOW() - INTERVAL '30 days'
-ORDER BY user_id, session_date;`,
-    bash: `#!/bin/bash
-# Скрипт мониторинга сервиса
+WHERE created_at >= NOW() - INTERVAL '30 days'
+ORDER BY user_id, created_at;`,
 
-SERVICE_NAME="nexus-api"
-LOG_FILE="/var/log/nexus-monitor.log"
-MAX_RESTARTS=3
-restart_count=0
+  bash: `#!/bin/bash
+SERVICE="oxiwis-api"
+MAX=3; count=0
 
-check_service() {
-    if ! systemctl is-active --quiet "$SERVICE_NAME"; then
-        echo "[$(date)] Service $SERVICE_NAME is down. Restarting..." >> "$LOG_FILE"
-        systemctl restart "$SERVICE_NAME"
-        ((restart_count++))
-        return 1
-    fi
-    return 0
+check() {
+  systemctl is-active --quiet "$SERVICE" && return 0
+  echo "[$(date)] Restarting $SERVICE..." >> /var/log/oxiwis.log
+  systemctl restart "$SERVICE"
+  ((count++))
 }
 
 while true; do
-    if ! check_service; then
-        if [ $restart_count -ge $MAX_RESTARTS ]; then
-            echo "[$(date)] Max restarts reached. Alerting admin..." >> "$LOG_FILE"
-            # send_alert
-            break
-        fi
-    fi
-    sleep 30
+  check
+  [ $count -ge $MAX ] && { echo "Max restarts hit"; break; }
+  sleep 30
 done`,
-  };
+};
 
-  const code = codeExamples[lang] || codeExamples.javascript;
-  return {
-    text: `Конечно! Вот пример на **${lang}**:`,
-    code,
-    lang,
-  };
-}
-
-function generateAIResponse(userMsg: string): { content: string; hasCode: boolean } {
-  const isCodeRequest = detectCodeRequest(userMsg);
-
-  if (isCodeRequest) {
-    const { text, code, lang } = generateCodeResponse(userMsg);
+function generateReply(userMsg: string): { content: string } {
+  if (detectCode(userMsg)) {
+    const lang = detectLang(userMsg);
+    const code = CODE_EXAMPLES[lang] ?? CODE_EXAMPLES.python;
     return {
-      content: `${text}\n\`\`\`${lang}\n${code}\n\`\`\`\nКод готов к использованию. Если нужны пояснения или модификации — скажи.`,
-      hasCode: true,
+      content: `Конечно, вот пример на **${lang}**:\n\`\`\`${lang}\n${code}\n\`\`\`\nЕсли нужны пояснения или доработка — скажи.`,
     };
   }
-
-  const responses = [
-    "NEXUS обработал ваш запрос. Анализ завершён — модель использует трансформерную архитектуру с 175B параметров и контекстным окном 128k токенов.",
-    "Запрос принят и обработан. Система работает в режиме максимальной точности. Если нужен более детальный ответ — уточните запрос.",
-    "Понял задачу. NEXUS AI оптимизирован для сложных аналитических задач, генерации кода и работы с большими объёмами данных.",
-    "Ответ сгенерирован с использованием контекста диалога. Точность модели на этой задаче — 94.7%. Хотите расширить ответ?",
+  const replies = [
+    "OxiwisAI обработал запрос. Модель использует архитектуру MoE с триллионом параметров и контекстным окном 200k токенов.",
+    "Запрос принят. OxiwisAI работает на кластере Oxiwis с пиковой производительностью 10 экзафлопс.",
+    "Ответ сформирован. Точность модели на этой задаче — 96.2%. Хотите детализировать?",
+    "Задача выполнена. OxiwisAI оптимизирован для сложных рассуждений, кода и многоязычных задач.",
   ];
-  return {
-    content: responses[Math.floor(Math.random() * responses.length)],
-    hasCode: false,
-  };
+  return { content: replies[Math.floor(Math.random() * replies.length)] };
 }
+
+// ─── КОМПОНЕНТ: БЛОК КОДА ─────────────────────────────────────────────────
 
 function CodeBlock({ code, lang }: { code: string; lang: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
+  const copy = () => {
     navigator.clipboard.writeText(code).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -185,93 +170,75 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
 
   return (
     <div className="code-block mt-3 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-blue-500/20 bg-black/40">
-        <span className="font-mono text-xs text-blue-400">{lang}</span>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.07] bg-black/30">
+        <span className="font-mono text-xs text-white/35">{lang}</span>
         <button
-          onClick={handleCopy}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-all duration-200
-            bg-blue-500/10 border border-blue-500/30 text-blue-300
-            hover:bg-blue-500/20 hover:border-blue-400 hover:text-blue-200"
+          onClick={copy}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-all
+            bg-white/[0.05] border border-white/[0.09] text-white/50
+            hover:bg-white/[0.09] hover:text-white/80 hover:border-white/[0.18]"
         >
-          {copied ? (
-            <>
-              <Icon name="Check" size={11} />
-              Скопировано
-            </>
-          ) : (
-            <>
-              <Icon name="Copy" size={11} />
-              Копировать
-            </>
-          )}
+          <Icon name={copied ? "Check" : "Copy"} size={11} />
+          {copied ? "Скопировано" : "Копировать"}
         </button>
       </div>
-      <pre className="p-4 text-sm font-mono text-green-300/90 overflow-x-auto leading-relaxed">
+      <pre className="p-4 text-sm font-mono text-white/75 overflow-x-auto leading-relaxed">
         <code>{code}</code>
       </pre>
     </div>
   );
 }
 
-function parseMessageContent(content: string) {
+function parseContent(text: string) {
   const parts: Array<{ type: "text" | "code"; content: string; lang?: string }> = [];
-  const regex = /```(\w+)?\n([\s\S]*?)```/g;
-  let lastIndex = 0;
-  let match;
-
-  while ((match = regex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push({ type: "text", content: content.slice(lastIndex, match.index) });
-    }
-    parts.push({ type: "code", content: match[2], lang: match[1] || "code" });
-    lastIndex = match.index + match[0].length;
+  const re = /```(\w+)?\n([\s\S]*?)```/g;
+  let last = 0, m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push({ type: "text", content: text.slice(last, m.index) });
+    parts.push({ type: "code", content: m[2], lang: m[1] ?? "code" });
+    last = m.index + m[0].length;
   }
-
-  if (lastIndex < content.length) {
-    parts.push({ type: "text", content: content.slice(lastIndex) });
-  }
-
+  if (last < text.length) parts.push({ type: "text", content: text.slice(last) });
   return parts;
 }
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === "user";
-  const parts = parseMessageContent(msg.content);
+  const parts = parseContent(msg.content);
 
   return (
-    <div className={`flex gap-3 animate-fade-in ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-1
+    <div className={`flex gap-3 animate-fade-in ${isUser ? "flex-row-reverse" : ""}`}>
+      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5
         ${isUser
-          ? "bg-gradient-to-br from-violet-600 to-violet-800 border border-violet-500/50"
-          : "bg-gradient-to-br from-blue-600 to-blue-900 border border-blue-500/50"
+          ? "bg-white/10 border border-white/15"
+          : "bg-white/[0.06] border border-white/10"
         }`}>
-        <Icon name={isUser ? "User" : "Bot"} size={14} className="text-white" />
+        {isUser
+          ? <Icon name="User" size={13} className="text-white/60" />
+          : <img src={LOGO_URL} alt="OxiwisAI" className="w-5 h-5 object-contain rounded-sm" />
+        }
       </div>
-      <div className={`max-w-[75%] ${isUser ? "items-end" : "items-start"} flex flex-col gap-1`}>
+      <div className={`max-w-[74%] flex flex-col gap-1 ${isUser ? "items-end" : "items-start"}`}>
         <div className={`rounded-xl px-4 py-3 text-sm leading-relaxed
           ${isUser
-            ? "bg-gradient-to-br from-violet-600/30 to-blue-600/20 border border-violet-500/30 text-foreground"
-            : "glass-card text-foreground"
+            ? "bg-white/[0.07] border border-white/[0.09] text-white/80"
+            : "glass text-white/80"
           }`}>
-          {parts.map((part, i) =>
-            part.type === "code" ? (
-              <CodeBlock key={i} code={part.content} lang={part.lang || "code"} />
-            ) : (
-              <span key={i} className="whitespace-pre-wrap"
-                dangerouslySetInnerHTML={{
-                  __html: part.content
-                    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-blue-300">$1</strong>')
-                    .replace(/`([^`]+)`/g, '<code class="font-mono text-xs bg-black/40 px-1.5 py-0.5 rounded text-green-400">$1</code>')
-                }}
-              />
-            )
+          {parts.map((p, i) =>
+            p.type === "code"
+              ? <CodeBlock key={i} code={p.content} lang={p.lang ?? "code"} />
+              : <span key={i} className="whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={{
+                    __html: p.content
+                      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white/95">$1</strong>')
+                      .replace(/`([^`]+)`/g, '<code class="font-mono text-xs bg-black/40 px-1.5 py-0.5 rounded text-white/60">$1</code>')
+                  }}
+                />
           )}
         </div>
         <div className="flex items-center gap-2 px-1">
-          <span className="text-xs text-muted-foreground font-mono">
-            {msg.tokens} токенов
-          </span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs text-white/20 font-mono">{msg.tokens} tok</span>
+          <span className="text-xs text-white/20">
             {msg.timestamp.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
@@ -284,19 +251,19 @@ function MessageBubble({ msg }: { msg: Message }) {
 
 function HomePage({ onNavigate }: { onNavigate: (p: Page) => void }) {
   const stats = [
-    { label: "Параметров", value: "175B", icon: "Cpu" },
-    { label: "Контекст", value: "128K", icon: "Layers" },
-    { label: "Языков", value: "95+", icon: "Globe" },
-    { label: "Точность", value: "94.7%", icon: "Target" },
+    { label: "Параметров", value: "1T+", icon: "Cpu" },
+    { label: "Контекст", value: "200K", icon: "Layers" },
+    { label: "Языков", value: "120+", icon: "Globe" },
+    { label: "Точность", value: "96.2%", icon: "Target" },
   ];
 
   const features = [
-    { icon: "Code2", title: "Генерация кода", desc: "Python, JS, TS, SQL, Bash и ещё 40+ языков с подсветкой и копированием", color: "blue" },
-    { icon: "MessageSquare", title: "Диалог с памятью", desc: "История диалогов сохраняется. Модель помнит контекст всей беседы", color: "violet" },
-    { icon: "Zap", title: "Токен-система", desc: "Точный учёт потребления токенов для каждого запроса и сессии", color: "cyan" },
-    { icon: "Shield", title: "Управление доступом", desc: "API-ключи, роли пользователей, лимиты и аудит-лог", color: "blue" },
-    { icon: "BarChart3", title: "Аналитика", desc: "Дашборд с метриками использования, топ запросов, статистика моделей", color: "violet" },
-    { icon: "Plug", title: "API интеграция", desc: "REST API с документацией OpenAPI 3.0, SDK для Python и JS", color: "cyan" },
+    { icon: "Code2",        title: "Генерация кода",        desc: "Python, TypeScript, SQL, Bash и 40+ языков. Каждый блок с кнопкой копирования." },
+    { icon: "MessageSquare",title: "История диалогов",      desc: "Контекст сохраняется на протяжении всей беседы. Переключайся между сессиями." },
+    { icon: "BarChart3",    title: "256 запросов в сутки",  desc: "Лимит обновляется каждую ночь в 00:00 по московскому времени." },
+    { icon: "Shield",       title: "Управление доступом",   desc: "API-ключи, роли пользователей, аудит-лог и лимиты на уровне аккаунта." },
+    { icon: "Zap",          title: "10 ExaFLOPS",           desc: "Кластер Oxiwis обеспечивает низкую задержку при пиковой нагрузке." },
+    { icon: "Plug",         title: "REST API",              desc: "OpenAPI 3.0 спецификация, SDK для Python и JavaScript." },
   ];
 
   return (
@@ -304,67 +271,58 @@ function HomePage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       {/* Hero */}
       <section className="relative min-h-screen flex items-center justify-center grid-bg overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/8 rounded-full blur-3xl animate-float" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-violet-600/8 rounded-full blur-3xl animate-float" style={{ animationDelay: "2s" }} />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px]
+            rounded-full bg-white/[0.015] blur-3xl animate-float" />
         </div>
 
-        <div className="relative z-10 text-center px-6 max-w-5xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 mb-8 animate-fade-in">
-            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-xs font-mono text-blue-300 tracking-widest uppercase">Система активна — v3.1.0</span>
+        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto">
+          <div className="flex justify-center mb-10 animate-fade-in">
+            <div className="relative w-24 h-24 rounded-2xl overflow-hidden animate-pulse-ring">
+              <img src={LOGO_URL} alt="OxiwisAI" className="logo-glow w-full h-full object-contain" />
+            </div>
           </div>
 
-          <h1
-            className="glitch text-6xl md:text-8xl font-black tracking-tight mb-6 animate-fade-in-up font-golos"
-            data-text="NEXUS AI"
-            style={{ animationDelay: "0.1s" }}
-          >
-            <span className="bg-gradient-to-r from-blue-400 via-violet-400 to-blue-400 bg-clip-text text-transparent">
-              NEXUS AI
-            </span>
+          <h1 className="text-6xl md:text-8xl font-black tracking-tight mb-4 animate-fade-up font-golos"
+            style={{ animationDelay: "0.05s" }}>
+            <span className="text-gradient">OxiwisAI</span>
           </h1>
 
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-4 animate-fade-in-up font-light" style={{ animationDelay: "0.2s" }}>
-            Языковая модель нового поколения
-          </p>
-          <p className="text-base text-muted-foreground/70 max-w-xl mx-auto mb-12 animate-fade-in-up" style={{ animationDelay: "0.3s" }}>
-            175B параметров · 128k контекст · генерация кода с кнопкой копирования · история диалогов
+          <p className="text-base font-mono text-white/30 tracking-widest uppercase mb-3 animate-fade-up"
+            style={{ animationDelay: "0.1s" }}>
+            by Oxiwis · 1 Trillion+ Parameters
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-in-up" style={{ animationDelay: "0.4s" }}>
-            <button
-              onClick={() => onNavigate("chat")}
-              className="px-8 py-4 bg-gradient-to-r from-blue-600 to-violet-600 rounded-xl font-semibold text-white
-                hover:from-blue-500 hover:to-violet-500 transition-all duration-300 hover:scale-105
-                shadow-lg shadow-blue-500/20 animate-pulse-neon"
-            >
+          <p className="text-lg text-white/45 max-w-xl mx-auto mb-10 animate-fade-up"
+            style={{ animationDelay: "0.15s" }}>
+            Языковая модель нового поколения. Контекст 200k токенов,
+            многошаговое рассуждение, генерация кода с копированием.
+          </p>
+
+          <div className="flex gap-3 justify-center flex-wrap animate-fade-up" style={{ animationDelay: "0.2s" }}>
+            <button className="btn-primary" onClick={() => onNavigate("chat")}>
               Открыть чат
             </button>
-            <button
-              onClick={() => onNavigate("docs")}
-              className="px-8 py-4 glass-card rounded-xl font-semibold text-foreground
-                hover:border-blue-500/40 transition-all duration-300 hover:scale-105"
-            >
+            <button className="btn-ghost" onClick={() => onNavigate("docs")}>
               Документация
             </button>
           </div>
         </div>
 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <Icon name="ChevronDown" size={20} className="text-muted-foreground/40" />
+          <Icon name="ChevronDown" size={18} className="text-white/20" />
         </div>
       </section>
 
       {/* Stats */}
-      <section className="py-16 px-6 border-y border-border">
-        <div className="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
+      <section className="py-14 px-6 border-y border-white/[0.06]">
+        <div className="max-w-4xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
           {stats.map((s, i) => (
-            <div key={s.label} className="text-center animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
-              <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mx-auto mb-3">
-                <Icon name={s.icon} size={20} className="text-blue-400" />
+            <div key={s.label} className="text-center animate-fade-up" style={{ animationDelay: `${i * 0.08}s` }}>
+              <div className="w-11 h-11 rounded-xl bg-white/[0.05] border border-white/[0.08] flex items-center justify-center mx-auto mb-3">
+                <Icon name={s.icon} size={18} className="text-white/50" />
               </div>
-              <div className="text-3xl font-black font-mono neon-text-blue mb-1">{s.value}</div>
-              <div className="text-sm text-muted-foreground">{s.label}</div>
+              <div className="text-3xl font-black font-mono text-white/90 mb-1">{s.value}</div>
+              <div className="text-sm text-white/35">{s.label}</div>
             </div>
           ))}
         </div>
@@ -373,27 +331,18 @@ function HomePage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       {/* Features */}
       <section className="py-20 px-6">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-3 font-golos">Возможности</h2>
-          <p className="text-muted-foreground text-center mb-12">Всё что нужно для работы с AI в одном месте</p>
-          <div className="grid md:grid-cols-3 gap-5">
+          <h2 className="text-2xl font-bold text-center mb-2 font-golos text-white/80">Возможности</h2>
+          <p className="text-white/35 text-center text-sm mb-12">Всё для работы с AI на одной платформе</p>
+          <div className="grid md:grid-cols-3 gap-4">
             {features.map((f, i) => (
-              <div
-                key={f.title}
-                className="glass-card rounded-xl p-6 hover:border-blue-500/30 transition-all duration-300 hover:translate-y-[-2px] animate-fade-in-up cursor-default"
-                style={{ animationDelay: `${i * 0.08}s` }}
-              >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4
-                  ${f.color === "blue" ? "bg-blue-500/15 border border-blue-500/25" :
-                    f.color === "violet" ? "bg-violet-500/15 border border-violet-500/25" :
-                    "bg-cyan-500/15 border border-cyan-500/25"}`}>
-                  <Icon name={f.icon} size={18} className={
-                    f.color === "blue" ? "text-blue-400" :
-                    f.color === "violet" ? "text-violet-400" :
-                    "text-cyan-400"
-                  } />
+              <div key={f.title}
+                className="glass glass-hover rounded-xl p-5 animate-fade-up cursor-default"
+                style={{ animationDelay: `${i * 0.06}s` }}>
+                <div className="w-9 h-9 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center mb-4">
+                  <Icon name={f.icon} size={16} className="text-white/50" />
                 </div>
-                <h3 className="font-semibold mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
+                <h3 className="font-semibold text-white/80 mb-1.5 text-sm">{f.title}</h3>
+                <p className="text-xs text-white/35 leading-relaxed">{f.desc}</p>
               </div>
             ))}
           </div>
@@ -401,17 +350,12 @@ function HomePage({ onNavigate }: { onNavigate: (p: Page) => void }) {
       </section>
 
       {/* CTA */}
-      <section className="py-20 px-6 text-center border-t border-border">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold mb-4 font-golos">Готовы начать?</h2>
-          <p className="text-muted-foreground mb-8">Запустите чат и попробуйте NEXUS AI прямо сейчас</p>
-          <button
-            onClick={() => onNavigate("chat")}
-            className="px-10 py-4 bg-gradient-to-r from-blue-600 to-violet-600 rounded-xl font-semibold text-white
-              hover:from-blue-500 hover:to-violet-500 transition-all duration-300 hover:scale-105"
-          >
-            Начать диалог
-          </button>
+      <section className="py-20 px-6 text-center border-t border-white/[0.06]">
+        <div className="max-w-lg mx-auto">
+          <img src={LOGO_URL} alt="OxiwisAI" className="w-12 h-12 object-contain mx-auto mb-6 opacity-60" />
+          <h2 className="text-2xl font-bold mb-3 font-golos text-white/80">Готовы начать?</h2>
+          <p className="text-white/35 text-sm mb-8">256 запросов в сутки · сброс в 00:00 МСК</p>
+          <button className="btn-primary" onClick={() => onNavigate("chat")}>Начать диалог</button>
         </div>
       </section>
     </div>
@@ -422,213 +366,193 @@ function HomePage({ onNavigate }: { onNavigate: (p: Page) => void }) {
 
 function ChatPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([
-    {
-      id: "1",
-      title: "Генерация кода на Python",
-      createdAt: new Date(Date.now() - 3600000),
-      messages: [],
-    }
+    { id: "1", title: "Новый диалог", messages: [], createdAt: new Date() }
   ]);
-  const [activeSessionId, setActiveSessionId] = useState("1");
+  const [activeId, setActiveId] = useState("1");
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
-  const [totalTokens, setTotalTokens] = useState(1240);
-  const [tokenLimit] = useState(50000);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [typing, setTyping] = useState(false);
+  const [requestsLeft, setRequestsLeft] = useState(256);
+  const [countdown, setCountdown] = useState(getMsUntilMidnightMsk());
+  const bottomRef = useRef<HTMLDivElement>(null);
 
-  const activeSession = sessions.find(s => s.id === activeSessionId)!;
+  const active = sessions.find(s => s.id === activeId)!;
+  const totalTokens = sessions.reduce((a, s) => a + s.messages.reduce((b, m) => b + m.tokens, 0), 0);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeSession?.messages, isTyping]);
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [active?.messages, typing]);
 
-  const sendMessage = () => {
-    if (!input.trim() || isTyping) return;
+  useEffect(() => {
+    const t = setInterval(() => {
+      const ms = getMsUntilMidnightMsk();
+      setCountdown(ms);
+      if (ms < 1000) setRequestsLeft(DAILY_LIMIT);
+    }, 1000);
+    return () => clearInterval(t);
+  }, []);
 
-    const userTokens = Math.ceil(input.length / 4);
-    const userMsg: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: input.trim(),
-      tokens: userTokens,
-      timestamp: new Date(),
-    };
-
+  const send = () => {
+    if (!input.trim() || typing || requestsLeft <= 0) return;
+    const tok = Math.ceil(input.length / 4);
+    const userMsg: Message = { id: Date.now().toString(), role: "user", content: input.trim(), tokens: tok, timestamp: new Date() };
     setSessions(prev => prev.map(s =>
-      s.id === activeSessionId
-        ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? input.slice(0, 40) : s.title }
+      s.id === activeId
+        ? { ...s, messages: [...s.messages, userMsg], title: s.messages.length === 0 ? input.slice(0, 38) : s.title }
         : s
     ));
-    setTotalTokens(t => t + userTokens);
+    setRequestsLeft(r => r - 1);
     setInput("");
-    setIsTyping(true);
-
+    setTyping(true);
     setTimeout(() => {
-      const { content, hasCode } = generateAIResponse(userMsg.content);
-      const aiTokens = Math.ceil(content.length / 4);
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content,
-        tokens: aiTokens,
-        timestamp: new Date(),
-        hasCode,
-      };
-      setSessions(prev => prev.map(s =>
-        s.id === activeSessionId ? { ...s, messages: [...s.messages, aiMsg] } : s
-      ));
-      setTotalTokens(t => t + aiTokens);
-      setIsTyping(false);
-    }, 1200 + Math.random() * 800);
+      const { content } = generateReply(userMsg.content);
+      const aiTok = Math.ceil(content.length / 4);
+      const aiMsg: Message = { id: (Date.now() + 1).toString(), role: "assistant", content, tokens: aiTok, timestamp: new Date() };
+      setSessions(prev => prev.map(s => s.id === activeId ? { ...s, messages: [...s.messages, aiMsg] } : s));
+      setTyping(false);
+    }, 1000 + Math.random() * 900);
   };
 
   const newSession = () => {
     const id = Date.now().toString();
     setSessions(prev => [...prev, { id, title: "Новый диалог", messages: [], createdAt: new Date() }]);
-    setActiveSessionId(id);
+    setActiveId(id);
   };
 
-  const tokenPercent = Math.min((totalTokens / tokenLimit) * 100, 100);
-
   return (
-    <div className="flex h-[calc(100vh-60px)]">
+    <div className="flex h-[calc(100vh-56px)]">
       {/* Sidebar */}
-      <div className="w-64 border-r border-border flex flex-col bg-black/20">
-        <div className="p-4 border-b border-border">
-          <button
-            onClick={newSession}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium
-              bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors"
-          >
-            <Icon name="Plus" size={14} />
+      <div className="w-60 border-r border-white/[0.06] flex flex-col bg-black/10 flex-shrink-0">
+        <div className="p-3 border-b border-white/[0.06]">
+          <button onClick={newSession}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-white/50
+              bg-white/[0.04] border border-white/[0.08] hover:bg-white/[0.07] hover:text-white/70 transition-colors">
+            <Icon name="Plus" size={13} />
             Новый диалог
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+        <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {sessions.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setActiveSessionId(s.id)}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors truncate
-                ${s.id === activeSessionId
-                  ? "bg-blue-500/15 border border-blue-500/25 text-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-            >
+            <button key={s.id} onClick={() => setActiveId(s.id)}
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors
+                ${s.id === activeId
+                  ? "bg-white/[0.07] border border-white/[0.1] text-white/80"
+                  : "text-white/40 hover:bg-white/[0.04] hover:text-white/65"
+                }`}>
               <div className="flex items-center gap-2">
-                <Icon name="MessageSquare" size={12} />
-                <span className="truncate">{s.title}</span>
+                <Icon name="MessageSquare" size={11} />
+                <span className="truncate text-xs">{s.title}</span>
               </div>
-              <div className="text-xs text-muted-foreground/60 mt-0.5 font-mono">
-                {s.messages.length} сообщений
-              </div>
+              <div className="text-white/25 text-xs mt-0.5 font-mono pl-[19px]">{s.messages.length} сообщ.</div>
             </button>
           ))}
         </div>
 
-        {/* Token usage */}
-        <div className="p-4 border-t border-border">
-          <div className="flex justify-between text-xs text-muted-foreground mb-2 font-mono">
-            <span>Токены</span>
-            <span>{totalTokens.toLocaleString()} / {tokenLimit.toLocaleString()}</span>
+        {/* Requests counter */}
+        <div className="p-3 border-t border-white/[0.06] space-y-3">
+          <div>
+            <div className="flex justify-between text-xs text-white/30 mb-1.5 font-mono">
+              <span>Запросы</span>
+              <span>{requestsLeft} / {DAILY_LIMIT}</span>
+            </div>
+            <div className="h-1 bg-white/[0.06] rounded-full overflow-hidden">
+              <div className="token-bar h-full" style={{ width: `${(requestsLeft / DAILY_LIMIT) * 100}%` }} />
+            </div>
           </div>
-          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div
-              className="token-bar h-full"
-              style={{ width: `${tokenPercent}%` }}
-            />
-          </div>
-          <div className="text-xs text-muted-foreground/60 mt-1.5 font-mono">
-            {(tokenLimit - totalTokens).toLocaleString()} осталось
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-white/20 font-mono">Сброс в 00:00 МСК</span>
+            <span className="text-xs font-mono text-white/35">{formatCountdown(countdown)}</span>
           </div>
         </div>
       </div>
 
-      {/* Chat area */}
-      <div className="flex-1 flex flex-col">
+      {/* Chat */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top bar */}
+        <div className="h-11 border-b border-white/[0.06] flex items-center px-5 gap-3">
+          <img src={LOGO_URL} alt="OxiwisAI" className="w-5 h-5 object-contain opacity-60" />
+          <span className="text-sm font-mono text-white/40">OxiwisAI</span>
+          <span className="badge-mono ml-auto">{totalTokens.toLocaleString()} токенов</span>
+        </div>
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
-          {activeSession.messages.length === 0 && (
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {active.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600/20 to-violet-600/20 border border-blue-500/20 flex items-center justify-center mb-4">
-                <Icon name="Bot" size={28} className="text-blue-400" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">NEXUS AI готов</h3>
-              <p className="text-muted-foreground text-sm max-w-sm">
-                Спросите что угодно. Для кода напишите «напиши функцию» или «покажи пример на Python» — получите блок с кнопкой копирования.
+              <img src={LOGO_URL} alt="OxiwisAI" className="w-16 h-16 object-contain mb-5 opacity-30 animate-float" />
+              <p className="text-white/30 text-sm font-mono mb-1">OxiwisAI готов</p>
+              <p className="text-white/20 text-xs max-w-xs">
+                Задайте любой вопрос. Для кода напишите «напиши функцию на Python» — получите блок с кнопкой копирования.
               </p>
               <div className="flex flex-wrap gap-2 mt-6 justify-center">
-                {["Напиши функцию на Python", "Объясни как работает JWT", "Покажи код на TypeScript"].map(hint => (
-                  <button
-                    key={hint}
-                    onClick={() => setInput(hint)}
-                    className="px-3 py-1.5 text-xs rounded-lg glass-card text-muted-foreground hover:text-foreground hover:border-blue-500/30 transition-colors"
-                  >
-                    {hint}
+                {["Напиши функцию на Python", "Покажи пример на TypeScript", "Что такое нейросеть?"].map(h => (
+                  <button key={h} onClick={() => setInput(h)}
+                    className="px-3 py-1.5 text-xs rounded-lg glass text-white/35 hover:text-white/60 transition-colors">
+                    {h}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {activeSession.messages.map(msg => (
-            <MessageBubble key={msg.id} msg={msg} />
-          ))}
+          {active.messages.map(msg => <MessageBubble key={msg.id} msg={msg} />)}
 
-          {isTyping && (
+          {typing && (
             <div className="flex gap-3 animate-fade-in">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-blue-900 border border-blue-500/50 flex items-center justify-center flex-shrink-0">
-                <Icon name="Bot" size={14} className="text-white" />
+              <div className="w-8 h-8 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center flex-shrink-0">
+                <img src={LOGO_URL} alt="OxiwisAI" className="w-5 h-5 object-contain" />
               </div>
-              <div className="glass-card rounded-xl px-4 py-3">
+              <div className="glass rounded-xl px-4 py-3">
                 <div className="flex gap-1.5 items-center h-5">
-                  {[0, 0.2, 0.4].map(d => (
-                    <div key={d} className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: `${d}s` }} />
+                  {[0, 0.18, 0.36].map(d => (
+                    <div key={d} className="w-1.5 h-1.5 rounded-full bg-white/30 animate-bounce" style={{ animationDelay: `${d}s` }} />
                   ))}
                 </div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+          <div ref={bottomRef} />
         </div>
 
         {/* Input */}
-        <div className="p-4 border-t border-border">
-          <div className="flex gap-3 items-end">
-            <div className="flex-1 relative">
-              <textarea
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                placeholder="Введите запрос... (Shift+Enter для переноса)"
-                rows={1}
-                className="w-full px-4 py-3 bg-muted/50 border border-border rounded-xl text-sm resize-none
-                  focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20
-                  placeholder:text-muted-foreground/50 font-golos transition-colors"
-                style={{ minHeight: "48px", maxHeight: "160px" }}
-                onInput={e => {
-                  const t = e.target as HTMLTextAreaElement;
-                  t.style.height = "auto";
-                  t.style.height = Math.min(t.scrollHeight, 160) + "px";
-                }}
-              />
+        <div className="p-4 border-t border-white/[0.06]">
+          {requestsLeft === 0 && (
+            <div className="mb-3 px-4 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] text-center">
+              <span className="text-xs text-white/35 font-mono">
+                Лимит исчерпан. Сброс в 00:00 МСК · {formatCountdown(countdown)}
+              </span>
             </div>
-            <button
-              onClick={sendMessage}
-              disabled={!input.trim() || isTyping}
-              className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center
-                hover:from-blue-500 hover:to-violet-500 disabled:opacity-40 disabled:cursor-not-allowed
-                transition-all duration-200 hover:scale-105 flex-shrink-0"
-            >
-              <Icon name="Send" size={16} className="text-white" />
+          )}
+          <div className="flex gap-2 items-end">
+            <textarea
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+              placeholder={requestsLeft === 0 ? "Лимит запросов исчерпан..." : "Введите запрос… (Shift+Enter — перенос)"}
+              disabled={requestsLeft === 0}
+              rows={1}
+              className="flex-1 px-4 py-3 bg-white/[0.04] border border-white/[0.08] rounded-xl text-sm resize-none
+                text-white/75 placeholder:text-white/20
+                focus:outline-none focus:border-white/[0.16]
+                disabled:opacity-40 disabled:cursor-not-allowed
+                transition-colors font-golos"
+              style={{ minHeight: "46px", maxHeight: "140px" }}
+              onInput={e => {
+                const t = e.target as HTMLTextAreaElement;
+                t.style.height = "auto";
+                t.style.height = Math.min(t.scrollHeight, 140) + "px";
+              }}
+            />
+            <button onClick={send} disabled={!input.trim() || typing || requestsLeft === 0}
+              className="w-11 h-11 rounded-xl bg-white/[0.08] border border-white/[0.1] flex items-center justify-center
+                hover:bg-white/[0.13] hover:border-white/[0.18] disabled:opacity-30 disabled:cursor-not-allowed
+                transition-all flex-shrink-0">
+              <Icon name="Send" size={15} className="text-white/70" />
             </button>
           </div>
           <div className="flex justify-between mt-2 px-1">
-            <span className="text-xs text-muted-foreground/50 font-mono">
-              ~{Math.ceil(input.length / 4)} токенов
-            </span>
-            <span className="text-xs text-muted-foreground/50 font-mono">NEXUS-3.1</span>
+            <span className="text-xs text-white/20 font-mono">~{Math.ceil(input.length / 4)} токенов</span>
+            <span className="text-xs text-white/20 font-mono">OxiwisAI · Oxiwis</span>
           </div>
         </div>
       </div>
@@ -639,212 +563,98 @@ function ChatPage() {
 // ─── СТРАНИЦА: ДОКУМЕНТАЦИЯ ─────────────────────────────────────────────────
 
 function DocsPage() {
-  const [activeSection, setActiveSection] = useState("quickstart");
+  const [active, setActive] = useState("quickstart");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const copyCode = (code: string, id: string) => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    });
+  const copy = (code: string, id: string) => {
+    navigator.clipboard.writeText(code).then(() => { setCopiedId(id); setTimeout(() => setCopiedId(null), 2000); });
   };
 
   const sections = [
     { id: "quickstart", label: "Быстрый старт", icon: "Zap" },
-    { id: "auth", label: "Аутентификация", icon: "Key" },
-    { id: "chat", label: "Chat API", icon: "MessageSquare" },
-    { id: "models", label: "Модели", icon: "Cpu" },
-    { id: "tokens", label: "Токены", icon: "BarChart3" },
-    { id: "errors", label: "Ошибки", icon: "AlertTriangle" },
+    { id: "auth",       label: "Аутентификация", icon: "Key" },
+    { id: "chat",       label: "Chat API",        icon: "MessageSquare" },
+    { id: "models",     label: "Модели",          icon: "Cpu" },
+    { id: "limits",     label: "Лимиты",          icon: "BarChart3" },
+    { id: "errors",     label: "Ошибки",          icon: "AlertTriangle" },
   ];
 
-  const codeSnippets: Record<string, { title: string; lang: string; code: string }[]> = {
+  const snippets: Record<string, { title: string; lang: string; code: string }[]> = {
     quickstart: [
-      {
-        title: "Установка SDK",
-        lang: "bash",
-        code: `pip install nexus-ai-sdk
-# или
-npm install @nexus-ai/sdk`,
-      },
-      {
-        title: "Первый запрос",
-        lang: "python",
-        code: `from nexus_ai import NexusClient
-
-client = NexusClient(api_key="your-api-key")
-
-response = client.chat.complete(
-    model="nexus-3.1",
-    messages=[
-        {"role": "user", "content": "Привет! Напиши функцию сортировки на Python"}
-    ]
-)
-
-print(response.content)
-print(f"Использовано токенов: {response.usage.total_tokens}")`,
-      },
+      { title: "Установка SDK", lang: "bash", code: `pip install oxiwis-sdk\n# или\nnpm install @oxiwis/sdk` },
+      { title: "Первый запрос", lang: "python", code: `from oxiwis import OxiwisClient\n\nclient = OxiwisClient(api_key="your-api-key")\n\nresponse = client.chat.complete(\n    model="oxiwis-1t",\n    messages=[{"role": "user", "content": "Привет!"}]\n)\n\nprint(response.content)\nprint(f"Токенов: {response.usage.total_tokens}")` },
     ],
     auth: [
-      {
-        title: "API ключ в заголовке",
-        lang: "bash",
-        code: `curl https://api.nexus.ai/v1/chat/complete \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"model": "nexus-3.1", "messages": [{"role": "user", "content": "Hello"}]}'`,
-      },
+      { title: "API ключ в заголовке", lang: "bash", code: `curl https://api.oxiwis.ai/v1/chat/complete \\\n  -H "Authorization: Bearer YOUR_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"oxiwis-1t","messages":[{"role":"user","content":"Hello"}]}'` },
     ],
     chat: [
-      {
-        title: "Стриминговый ответ",
-        lang: "python",
-        code: `stream = client.chat.stream(
-    model="nexus-3.1",
-    messages=[{"role": "user", "content": "Расскажи про трансформеры"}],
-    max_tokens=1000,
-    temperature=0.7,
-)
-
-for chunk in stream:
-    print(chunk.delta, end="", flush=True)`,
-      },
-      {
-        title: "JavaScript / Fetch",
-        lang: "javascript",
-        code: `const response = await fetch('https://api.nexus.ai/v1/chat/complete', {
-  method: 'POST',
-  headers: {
-    'Authorization': \`Bearer \${apiKey}\`,
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    model: 'nexus-3.1',
-    messages: [{ role: 'user', content: 'Hello!' }],
-    stream: false,
-  }),
-});
-const data = await response.json();
-console.log(data.choices[0].message.content);`,
-      },
+      { title: "Стриминговый ответ", lang: "python", code: `stream = client.chat.stream(\n    model="oxiwis-1t",\n    messages=[{"role": "user", "content": "Расскажи о квантовых компьютерах"}],\n    max_tokens=1000,\n)\n\nfor chunk in stream:\n    print(chunk.delta, end="", flush=True)` },
+      { title: "JavaScript", lang: "javascript", code: `const res = await fetch('https://api.oxiwis.ai/v1/chat/complete', {\n  method: 'POST',\n  headers: { 'Authorization': \`Bearer \${key}\`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({ model: 'oxiwis-1t', messages: [{role:'user', content:'Hello'}] }),\n});\nconst data = await res.json();\nconsole.log(data.choices[0].message.content);` },
     ],
     models: [
-      {
-        title: "Список моделей",
-        lang: "python",
-        code: `models = client.models.list()
-for model in models:
-    print(f"{model.id}: {model.context_length} токенов")
-
-# nexus-3.1      128,000 токенов
-# nexus-3.1-fast  32,000 токенов
-# nexus-2.8       16,000 токенов`,
-      },
+      { title: "Список моделей", lang: "python", code: `models = client.models.list()\nfor m in models:\n    print(f"{m.id}: {m.context_length} tokens, {m.params}")\n\n# oxiwis-1t       200,000 tokens  · 1T params\n# oxiwis-1t-fast   64,000 tokens  · 1T params (speed-optimized)\n# oxiwis-70b       32,000 tokens  · 70B params` },
     ],
-    tokens: [
-      {
-        title: "Подсчёт токенов",
-        lang: "python",
-        code: `# Подсчёт до отправки
-count = client.tokens.count(
-    model="nexus-3.1",
-    messages=[{"role": "user", "content": "Текст запроса"}]
-)
-print(f"Запрос будет стоить: {count.total} токенов")
-
-# Статистика использования
-usage = client.usage.get(period="month")
-print(f"Потрачено за месяц: {usage.total_tokens:,} токенов")`,
-      },
+    limits: [
+      { title: "Лимиты и сброс", lang: "python", code: `# 256 запросов в сутки на пользователя\n# Сброс в 00:00 по московскому времени (UTC+3)\n\ninfo = client.account.limits()\nprint(f"Осталось запросов: {info.requests_left}/{info.requests_limit}")\nprint(f"Сброс: {info.reset_at_msk}")  # 2026-05-07T00:00:00+03:00` },
     ],
     errors: [
-      {
-        title: "Обработка ошибок",
-        lang: "python",
-        code: `from nexus_ai.exceptions import (
-    RateLimitError,
-    TokenLimitError,
-    AuthenticationError,
-)
-
-try:
-    response = client.chat.complete(
-        model="nexus-3.1",
-        messages=[{"role": "user", "content": "Hello"}]
-    )
-except RateLimitError as e:
-    print(f"Лимит запросов. Повтор через {e.retry_after}s")
-except TokenLimitError as e:
-    print(f"Превышен лимит токенов: {e.used}/{e.limit}")
-except AuthenticationError:
-    print("Неверный API ключ")`,
-      },
+      { title: "Обработка ошибок", lang: "python", code: `from oxiwis.exceptions import RateLimitError, DailyLimitError, AuthError\n\ntry:\n    response = client.chat.complete(model="oxiwis-1t", messages=[...])\nexcept DailyLimitError as e:\n    print(f"Суточный лимит исчерпан. Сброс в 00:00 МСК")\nexcept RateLimitError as e:\n    print(f"Слишком частые запросы. Ждите {e.retry_after}s")\nexcept AuthError:\n    print("Неверный API-ключ")` },
     ],
   };
 
-  const current = codeSnippets[activeSection] || [];
+  const current = snippets[active] ?? [];
 
   return (
-    <div className="flex h-[calc(100vh-60px)]">
-      {/* Sidebar */}
-      <div className="w-56 border-r border-border bg-black/20 p-4">
-        <p className="text-xs font-mono text-muted-foreground/60 uppercase tracking-widest mb-4">Разделы</p>
-        <nav className="space-y-1">
+    <div className="flex h-[calc(100vh-56px)]">
+      <div className="w-52 border-r border-white/[0.06] bg-black/10 p-3 flex-shrink-0">
+        <p className="text-xs font-mono text-white/20 uppercase tracking-widest mb-3 px-1">Разделы</p>
+        <nav className="space-y-0.5">
           {sections.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setActiveSection(s.id)}
-              className={`w-full text-left flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors
-                ${activeSection === s.id
-                  ? "bg-blue-500/15 border border-blue-500/25 text-blue-300"
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}
-            >
-              <Icon name={s.icon} size={14} />
+            <button key={s.id} onClick={() => setActive(s.id)}
+              className={`w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-colors
+                ${active === s.id
+                  ? "bg-white/[0.07] border border-white/[0.1] text-white/80"
+                  : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
+                }`}>
+              <Icon name={s.icon} size={12} />
               {s.label}
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Content */}
       <div className="flex-1 overflow-y-auto p-8">
         <div className="max-w-3xl mx-auto">
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-lg bg-blue-500/15 border border-blue-500/25 flex items-center justify-center">
-              <Icon name={sections.find(s => s.id === activeSection)?.icon ?? "Book"} size={18} className="text-blue-400" />
+            <div className="w-9 h-9 rounded-lg bg-white/[0.05] border border-white/[0.08] flex items-center justify-center">
+              <Icon name={sections.find(s => s.id === active)?.icon ?? "Book"} size={16} className="text-white/45" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold font-golos">{sections.find(s => s.id === activeSection)?.label}</h1>
-              <p className="text-sm text-muted-foreground font-mono">NEXUS AI API Docs v3.1</p>
+              <h1 className="text-xl font-bold font-golos text-white/80">{sections.find(s => s.id === active)?.label}</h1>
+              <p className="text-xs text-white/25 font-mono">OxiwisAI API · v1.0</p>
             </div>
           </div>
 
-          <div className="space-y-8">
-            {current.map((snippet, i) => (
-              <div key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <Icon name="ChevronRight" size={14} className="text-blue-400" />
-                  {snippet.title}
+          <div className="space-y-7">
+            {current.map((sn, i) => (
+              <div key={i} className="animate-fade-up" style={{ animationDelay: `${i * 0.08}s` }}>
+                <h3 className="text-sm font-semibold mb-3 text-white/60 flex items-center gap-2">
+                  <Icon name="ChevronRight" size={13} className="text-white/25" />
+                  {sn.title}
                 </h3>
                 <div className="code-block overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-blue-500/20 bg-black/40">
-                    <span className="font-mono text-xs text-blue-400">{snippet.lang}</span>
-                    <button
-                      onClick={() => copyCode(snippet.code, `${activeSection}-${i}`)}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-all duration-200
-                        bg-blue-500/10 border border-blue-500/30 text-blue-300
-                        hover:bg-blue-500/20 hover:border-blue-400 hover:text-blue-200"
-                    >
-                      {copiedId === `${activeSection}-${i}` ? (
-                        <><Icon name="Check" size={11} />Скопировано</>
-                      ) : (
-                        <><Icon name="Copy" size={11} />Копировать</>
-                      )}
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-white/[0.06] bg-black/30">
+                    <span className="font-mono text-xs text-white/30">{sn.lang}</span>
+                    <button onClick={() => copy(sn.code, `${active}-${i}`)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono transition-all
+                        bg-white/[0.04] border border-white/[0.08] text-white/40
+                        hover:bg-white/[0.08] hover:text-white/70 hover:border-white/[0.15]">
+                      <Icon name={copiedId === `${active}-${i}` ? "Check" : "Copy"} size={10} />
+                      {copiedId === `${active}-${i}` ? "Скопировано" : "Копировать"}
                     </button>
                   </div>
-                  <pre className="p-4 text-sm font-mono text-green-300/90 overflow-x-auto leading-relaxed">
-                    <code>{snippet.code}</code>
+                  <pre className="p-4 text-sm font-mono text-white/65 overflow-x-auto leading-relaxed">
+                    <code>{sn.code}</code>
                   </pre>
                 </div>
               </div>
@@ -860,92 +670,81 @@ except AuthenticationError:
 
 function AboutPage() {
   const specs = [
-    { label: "Архитектура", value: "Decoder-only Transformer" },
-    { label: "Параметры", value: "175B" },
-    { label: "Контекстное окно", value: "128,000 токенов" },
-    { label: "Слои", value: "96 layers" },
-    { label: "Attention heads", value: "96 heads" },
-    { label: "Размер словаря", value: "100,256 токенов" },
-    { label: "Обучающие данные", value: "3.2T токенов" },
-    { label: "Дата релиза", value: "Январь 2026" },
+    ["Компания",           "Oxiwis"],
+    ["Модель",             "OxiwisAI 1T"],
+    ["Архитектура",        "MoE Transformer (Decoder-only)"],
+    ["Параметры",          "1 000 000 000 000+"],
+    ["Контекстное окно",   "200 000 токенов"],
+    ["Обучающие данные",   "8T токенов"],
+    ["Поддерживаемые языки","120+"],
+    ["Лимит запросов",     "256 в сутки на пользователя"],
+    ["Сброс лимита",       "00:00 по московскому времени"],
+    ["Точность (MMLU)",    "96.2%"],
+    ["Задержка (p50)",     "0.9 сек"],
+    ["Дата релиза",        "2026"],
   ];
 
   const comparisons = [
-    { model: "NEXUS 3.1", context: "128K", params: "175B", speed: "98", quality: "97" },
-    { model: "NEXUS 2.8", context: "32K", params: "70B", speed: "100", quality: "89" },
-    { model: "NEXUS 2.4", context: "16K", params: "13B", speed: "100", quality: "78" },
+    { model: "OxiwisAI 1T",      ctx: "200K", params: "1T+",  q: 96, s: 88, current: true },
+    { model: "OxiwisAI 1T-Fast", ctx: "64K",  params: "1T+",  q: 91, s: 100, current: false },
+    { model: "OxiwisAI 70B",     ctx: "32K",  params: "70B",  q: 83, s: 100, current: false },
   ];
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="mb-12 animate-fade-in-up">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-violet-500/30 bg-violet-500/10 mb-6">
-          <Icon name="Cpu" size={12} className="text-violet-400" />
-          <span className="text-xs font-mono text-violet-300">NEXUS-3.1 · Production</span>
+    <div className="max-w-3xl mx-auto px-6 py-12">
+      <div className="flex items-center gap-4 mb-10 animate-fade-in">
+        <img src={LOGO_URL} alt="OxiwisAI" className="w-14 h-14 object-contain logo-glow opacity-80" />
+        <div>
+          <h1 className="text-3xl font-black font-golos text-gradient">OxiwisAI</h1>
+          <p className="text-xs font-mono text-white/30 mt-0.5">by Oxiwis · 1 Trillion+ Parameters</p>
         </div>
-        <h1 className="text-4xl font-black mb-4 font-golos">
-          <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">О модели</span>
-        </h1>
-        <p className="text-muted-foreground text-lg leading-relaxed max-w-2xl">
-          NEXUS AI — языковая модель на архитектуре трансформера с 175 миллиардами параметров.
-          Оптимизирована для генерации кода, аналитики и многошагового рассуждения.
-        </p>
       </div>
 
       {/* Specs */}
-      <div className="glass-card rounded-2xl p-6 mb-8 animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-        <h2 className="font-semibold mb-5 flex items-center gap-2">
-          <Icon name="Settings" size={16} className="text-blue-400" />
+      <div className="glass rounded-2xl p-6 mb-6 animate-fade-up" style={{ animationDelay: "0.05s" }}>
+        <h2 className="text-sm font-semibold text-white/55 mb-5 flex items-center gap-2">
+          <Icon name="Settings" size={14} className="text-white/30" />
           Технические характеристики
         </h2>
-        <div className="grid grid-cols-2 gap-3">
-          {specs.map((s, i) => (
-            <div key={s.label} className="flex justify-between items-center py-2.5 border-b border-border/50 last:border-0">
-              <span className="text-sm text-muted-foreground">{s.label}</span>
-              <span className="text-sm font-mono text-foreground">{s.value}</span>
+        <div className="space-y-0">
+          {specs.map(([label, value], i) => (
+            <div key={label} className={`flex justify-between items-center py-2.5 ${i < specs.length - 1 ? "border-b border-white/[0.05]" : ""}`}>
+              <span className="text-xs text-white/35">{label}</span>
+              <span className="text-xs font-mono text-white/65">{value}</span>
             </div>
           ))}
         </div>
       </div>
 
       {/* Comparison */}
-      <div className="glass-card rounded-2xl p-6 mb-8 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-        <h2 className="font-semibold mb-5 flex items-center gap-2">
-          <Icon name="BarChart3" size={16} className="text-violet-400" />
-          Сравнение моделей
+      <div className="glass rounded-2xl p-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
+        <h2 className="text-sm font-semibold text-white/55 mb-5 flex items-center gap-2">
+          <Icon name="BarChart3" size={14} className="text-white/30" />
+          Сравнение моделей Oxiwis
         </h2>
         <div className="space-y-4">
-          {comparisons.map((c, i) => (
-            <div key={c.model} className={`p-4 rounded-xl border transition-colors ${i === 0 ? "border-blue-500/30 bg-blue-500/5" : "border-border"}`}>
+          {comparisons.map(c => (
+            <div key={c.model} className={`p-4 rounded-xl border ${c.current ? "border-white/[0.12] bg-white/[0.03]" : "border-white/[0.06]"}`}>
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono font-semibold text-sm">{c.model}</span>
-                  {i === 0 && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Текущая</span>}
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-xs text-white/70">{c.model}</span>
+                  {c.current && <span className="badge-mono">текущая</span>}
                 </div>
-                <div className="flex gap-4 text-xs text-muted-foreground font-mono">
-                  <span>{c.context}</span>
-                  <span>{c.params}</span>
+                <div className="flex gap-4 text-xs font-mono text-white/30">
+                  <span>{c.ctx}</span><span>{c.params}</span>
                 </div>
               </div>
               <div className="space-y-2">
-                <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>Качество</span>
-                    <span>{c.quality}%</span>
+                {[{ label: "Качество", val: c.q }, { label: "Скорость", val: c.s }].map(b => (
+                  <div key={b.label}>
+                    <div className="flex justify-between text-xs text-white/25 mb-1">
+                      <span>{b.label}</span><span>{b.val}%</span>
+                    </div>
+                    <div className="h-1 bg-white/[0.05] rounded-full">
+                      <div className="h-full rounded-full token-bar" style={{ width: `${b.val}%` }} />
+                    </div>
                   </div>
-                  <div className="h-1.5 bg-muted rounded-full">
-                    <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-violet-500" style={{ width: `${c.quality}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>Скорость</span>
-                    <span>{c.speed}%</span>
-                  </div>
-                  <div className="h-1.5 bg-muted rounded-full">
-                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${c.speed}%` }} />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           ))}
@@ -958,148 +757,121 @@ function AboutPage() {
 // ─── СТРАНИЦА: АДМИН ────────────────────────────────────────────────────────
 
 function AdminPage() {
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "models" | "tokens">("overview");
+  const [tab, setTab] = useState<"overview" | "users" | "models" | "limits">("overview");
 
-  const stats = [
-    { label: "Активные пользователи", value: "2,847", change: "+12%", icon: "Users", color: "blue" },
-    { label: "Запросов сегодня", value: "143,291", change: "+8%", icon: "Zap", color: "violet" },
-    { label: "Токенов потрачено", value: "48.2M", change: "+23%", icon: "BarChart3", color: "cyan" },
-    { label: "Ошибок", value: "0.02%", change: "-5%", icon: "AlertTriangle", color: "green" },
+  const kpis = [
+    { label: "Активных пользователей", value: "3 241",   change: "+14%", icon: "Users",      up: true },
+    { label: "Запросов сегодня",       value: "187 442", change: "+9%",  icon: "Zap",        up: true },
+    { label: "Токенов обработано",     value: "62.1M",   change: "+31%", icon: "BarChart3",  up: true },
+    { label: "Ошибок",                 value: "0.01%",   change: "-8%",  icon: "AlertTriangle", up: false },
   ];
 
   const users = [
-    { id: "usr_001", email: "admin@nexus.ai", role: "Администратор", tokens: 250000, status: "active" },
-    { id: "usr_002", email: "dev@company.ru", role: "Разработчик", tokens: 50000, status: "active" },
-    { id: "usr_003", email: "analyst@corp.com", role: "Аналитик", tokens: 25000, status: "active" },
-    { id: "usr_004", email: "test@example.com", role: "Пользователь", tokens: 5000, status: "suspended" },
-  ];
-
-  const models = [
-    { id: "nexus-3.1", status: "active", requests: "98,421", latency: "1.2s", tokens: "38.1M" },
-    { id: "nexus-3.1-fast", status: "active", requests: "41,830", latency: "0.4s", tokens: "9.2M" },
-    { id: "nexus-2.8", status: "deprecated", requests: "3,040", latency: "0.8s", tokens: "0.9M" },
+    { id: "usr_001", email: "admin@oxiwis.ai",    role: "Администратор", req: 0,   status: "active" },
+    { id: "usr_002", email: "dev@company.ru",      role: "Разработчик",  req: 84,  status: "active" },
+    { id: "usr_003", email: "analyst@corp.com",    role: "Аналитик",     req: 201, status: "active" },
+    { id: "usr_004", email: "banned@example.com",  role: "Пользователь", req: 256, status: "suspended" },
   ];
 
   const tabs = [
-    { id: "overview", label: "Обзор", icon: "LayoutDashboard" },
-    { id: "users", label: "Пользователи", icon: "Users" },
-    { id: "models", label: "Модели", icon: "Cpu" },
-    { id: "tokens", label: "Токены", icon: "BarChart3" },
+    { id: "overview", label: "Обзор",         icon: "LayoutDashboard" },
+    { id: "users",    label: "Пользователи",   icon: "Users" },
+    { id: "models",   label: "Модели",         icon: "Cpu" },
+    { id: "limits",   label: "Лимиты",         icon: "BarChart3" },
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold font-golos">Панель администратора</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">NEXUS AI Management Console</p>
+          <h1 className="text-xl font-bold font-golos text-white/80">Панель администратора</h1>
+          <p className="text-xs text-white/25 font-mono mt-0.5">OxiwisAI Management Console</p>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30">
-          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          <span className="text-xs font-mono text-green-300">Все системы в норме</span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
+          <div className="w-1.5 h-1.5 rounded-full bg-white/50 animate-pulse" />
+          <span className="text-xs font-mono text-white/35">Все системы в норме</span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 bg-muted/30 rounded-xl mb-8 w-fit">
+      <div className="flex gap-0.5 p-1 bg-white/[0.03] border border-white/[0.06] rounded-xl mb-7 w-fit">
         {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setActiveTab(t.id as "overview" | "users" | "models" | "tokens")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors
-              ${activeTab === t.id
-                ? "bg-blue-600/80 text-white shadow-lg shadow-blue-500/20"
-                : "text-muted-foreground hover:text-foreground"
-              }`}
-          >
-            <Icon name={t.icon} size={14} />
+          <button key={t.id} onClick={() => setTab(t.id as typeof tab)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-medium transition-colors
+              ${tab === t.id ? "bg-white/[0.08] text-white/80 border border-white/[0.1]" : "text-white/30 hover:text-white/55"}`}>
+            <Icon name={t.icon} size={12} />
             {t.label}
           </button>
         ))}
       </div>
 
-      {activeTab === "overview" && (
+      {tab === "overview" && (
         <div className="space-y-6 animate-fade-in">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map(s => (
-              <div key={s.label} className="glass-card rounded-xl p-5">
+            {kpis.map(k => (
+              <div key={k.label} className="glass rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <Icon name={s.icon} size={18} className={
-                    s.color === "blue" ? "text-blue-400" :
-                    s.color === "violet" ? "text-violet-400" :
-                    s.color === "cyan" ? "text-cyan-400" : "text-green-400"
-                  } />
+                  <Icon name={k.icon} size={15} className="text-white/35" />
                   <span className={`text-xs font-mono px-2 py-0.5 rounded-full ${
-                    s.change.startsWith("+") ? "text-green-400 bg-green-400/10" : "text-red-400 bg-red-400/10"
-                  }`}>{s.change}</span>
+                    k.up ? "text-white/50 bg-white/[0.05]" : "text-white/35 bg-white/[0.03]"
+                  }`}>{k.change}</span>
                 </div>
-                <div className="text-2xl font-black font-mono mb-1">{s.value}</div>
-                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className="text-xl font-black font-mono text-white/85 mb-1">{k.value}</div>
+                <div className="text-xs text-white/30">{k.label}</div>
               </div>
             ))}
           </div>
 
-          {/* Recent activity */}
-          <div className="glass-card rounded-xl p-6">
-            <h3 className="font-semibold mb-4 flex items-center gap-2">
-              <Icon name="Activity" size={16} className="text-blue-400" />
-              Активность (последние 24ч)
+          <div className="glass rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-white/55 mb-4 flex items-center gap-2">
+              <Icon name="Activity" size={13} className="text-white/30" />
+              Активность за 24 часа
             </h3>
-            <div className="space-y-3">
-              {[
-                { time: "14:32", event: "Новый пользователь зарегистрирован", type: "info" },
-                { time: "13:58", event: "Превышен лимит токенов — usr_089", type: "warn" },
-                { time: "12:21", event: "Обновлена модель nexus-3.1 до патча 3.1.4", type: "success" },
-                { time: "09:44", event: "API ключ отозван — usr_042", type: "warn" },
-              ].map((a, i) => (
-                <div key={i} className="flex items-center gap-3 py-2 border-b border-border/50 last:border-0">
-                  <span className="font-mono text-xs text-muted-foreground w-12">{a.time}</span>
-                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                    a.type === "success" ? "bg-green-400" : a.type === "warn" ? "bg-yellow-400" : "bg-blue-400"
-                  }`} />
-                  <span className="text-sm text-muted-foreground">{a.event}</span>
-                </div>
-              ))}
-            </div>
+            {[
+              { time: "14:32", text: "Новый пользователь зарегистрирован", dot: "bg-white/40" },
+              { time: "13:58", text: "Суточный лимит исчерпан — usr_089",  dot: "bg-white/25" },
+              { time: "12:21", text: "Обновлена модель OxiwisAI 1T → patch 1.0.4", dot: "bg-white/55" },
+              { time: "09:44", text: "API-ключ отозван — usr_042",          dot: "bg-white/25" },
+            ].map((a, i) => (
+              <div key={i} className={`flex items-center gap-3 py-2.5 ${i < 3 ? "border-b border-white/[0.05]" : ""}`}>
+                <span className="font-mono text-xs text-white/20 w-11">{a.time}</span>
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${a.dot}`} />
+                <span className="text-xs text-white/40">{a.text}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {activeTab === "users" && (
-        <div className="glass-card rounded-xl overflow-hidden animate-fade-in">
-          <div className="flex items-center justify-between p-5 border-b border-border">
-            <h3 className="font-semibold">Пользователи ({users.length})</h3>
-            <button className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 transition-colors">
-              <Icon name="Plus" size={13} />
-              Добавить
+      {tab === "users" && (
+        <div className="glass rounded-xl overflow-hidden animate-fade-in">
+          <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+            <h3 className="text-sm font-semibold text-white/60">Пользователи ({users.length})</h3>
+            <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-white/[0.05] border border-white/[0.09] text-white/45 hover:text-white/70 transition-colors">
+              <Icon name="Plus" size={11} />Добавить
             </button>
           </div>
           <table className="w-full">
             <thead>
-              <tr className="border-b border-border">
-                {["ID", "Email", "Роль", "Лимит токенов", "Статус", ""].map(h => (
-                  <th key={h} className="px-5 py-3 text-left text-xs font-mono text-muted-foreground uppercase">{h}</th>
+              <tr className="border-b border-white/[0.05]">
+                {["ID", "Email", "Роль", "Запросов сегодня", "Статус"].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-mono text-white/20 uppercase">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {users.map(u => (
-                <tr key={u.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{u.id}</td>
-                  <td className="px-5 py-3 text-sm">{u.email}</td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">{u.role}</td>
-                  <td className="px-5 py-3 font-mono text-sm">{u.tokens.toLocaleString()}</td>
-                  <td className="px-5 py-3">
+                <tr key={u.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                  <td className="px-4 py-3 font-mono text-xs text-white/25">{u.id}</td>
+                  <td className="px-4 py-3 text-xs text-white/60">{u.email}</td>
+                  <td className="px-4 py-3 text-xs text-white/35">{u.role}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-white/50">{u.req} / 256</td>
+                  <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${
                       u.status === "active"
-                        ? "bg-green-500/10 border-green-500/30 text-green-300"
-                        : "bg-red-500/10 border-red-500/30 text-red-300"
+                        ? "bg-white/[0.05] border-white/[0.1] text-white/50"
+                        : "bg-white/[0.03] border-white/[0.06] text-white/25"
                     }`}>{u.status}</span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <button className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-                      <Icon name="MoreHorizontal" size={14} />
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -1108,23 +880,23 @@ function AdminPage() {
         </div>
       )}
 
-      {activeTab === "models" && (
-        <div className="space-y-4 animate-fade-in">
-          {models.map(m => (
-            <div key={m.id} className={`glass-card rounded-xl p-5 border ${m.status === "active" ? "border-blue-500/20" : "border-border"}`}>
-              <div className="flex items-center justify-between mb-4">
+      {tab === "models" && (
+        <div className="space-y-3 animate-fade-in">
+          {[
+            { id: "oxiwis-1t",      status: "active",     req: "141 291", latency: "0.9s", params: "1T+" },
+            { id: "oxiwis-1t-fast", status: "active",     req: "43 821",  latency: "0.3s", params: "1T+" },
+            { id: "oxiwis-70b",     status: "deprecated", req: "2 330",   latency: "0.5s", params: "70B" },
+          ].map(m => (
+            <div key={m.id} className={`glass rounded-xl p-5 border ${m.status === "active" ? "border-white/[0.1]" : "border-white/[0.05]"}`}>
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono font-semibold">{m.id}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border font-mono ${
-                    m.status === "active"
-                      ? "bg-green-500/10 border-green-500/30 text-green-300"
-                      : "bg-yellow-500/10 border-yellow-500/30 text-yellow-300"
-                  }`}>{m.status}</span>
+                  <span className="font-mono text-sm text-white/70">{m.id}</span>
+                  <span className={`badge-mono ${m.status === "deprecated" ? "opacity-50" : ""}`}>{m.status}</span>
+                  <span className="badge-mono">{m.params}</span>
                 </div>
-                <div className="flex gap-6 text-sm font-mono text-muted-foreground">
-                  <span>Запросов: <span className="text-foreground">{m.requests}</span></span>
-                  <span>Токенов: <span className="text-foreground">{m.tokens}</span></span>
-                  <span>Задержка: <span className="text-foreground">{m.latency}</span></span>
+                <div className="flex gap-5 text-xs font-mono text-white/30">
+                  <span>Запросов: <span className="text-white/55">{m.req}</span></span>
+                  <span>Задержка: <span className="text-white/55">{m.latency}</span></span>
                 </div>
               </div>
             </div>
@@ -1132,44 +904,40 @@ function AdminPage() {
         </div>
       )}
 
-      {activeTab === "tokens" && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="glass-card rounded-xl p-6">
-            <h3 className="font-semibold mb-6 flex items-center gap-2">
-              <Icon name="BarChart3" size={16} className="text-violet-400" />
-              Потребление токенов — последние 7 дней
+      {tab === "limits" && (
+        <div className="space-y-5 animate-fade-in">
+          <div className="glass rounded-xl p-6">
+            <h3 className="text-sm font-semibold text-white/55 mb-5 flex items-center gap-2">
+              <Icon name="BarChart3" size={14} className="text-white/30" />
+              Использование запросов — 7 дней
             </h3>
-            <div className="flex items-end gap-2 h-40">
-              {[62, 78, 45, 91, 88, 73, 100].map((h, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                  <div
-                    className="w-full rounded-t-sm bg-gradient-to-t from-blue-600 to-violet-500 transition-all duration-500"
-                    style={{ height: `${h}%` }}
-                  />
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][i]}
+            <div className="flex items-end gap-2 h-36">
+              {[58, 72, 41, 89, 81, 69, 100].map((h, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className="w-full rounded-sm bg-white/[0.08] transition-all" style={{ height: `${h}%` }} />
+                  <span className="text-xs font-mono text-white/20">
+                    {["Пн","Вт","Ср","Чт","Пт","Сб","Вс"][i]}
                   </span>
                 </div>
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Бесплатный план", used: 45, limit: 10000 },
-              { label: "Pro план", used: 78, limit: 100000 },
-              { label: "Enterprise", used: 23, limit: 1000000 },
-            ].map(p => (
-              <div key={p.label} className="glass-card rounded-xl p-5">
-                <div className="text-sm font-medium mb-3">{p.label}</div>
-                <div className="flex justify-between text-xs font-mono text-muted-foreground mb-2">
-                  <span>{p.used}%</span>
-                  <span>{p.limit.toLocaleString()}</span>
-                </div>
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="token-bar h-full" style={{ width: `${p.used}%` }} />
-                </div>
+          <div className="glass rounded-xl p-5">
+            <h3 className="text-sm font-semibold text-white/55 mb-4">Настройки лимитов</h3>
+            <div className="flex justify-between items-center py-3 border-b border-white/[0.05]">
+              <div>
+                <p className="text-xs text-white/60">Запросов в сутки</p>
+                <p className="text-xs text-white/25 mt-0.5">Сброс в 00:00 МСК</p>
               </div>
-            ))}
+              <span className="font-mono text-white/70 text-sm">256</span>
+            </div>
+            <div className="flex justify-between items-center py-3">
+              <div>
+                <p className="text-xs text-white/60">Временная зона сброса</p>
+                <p className="text-xs text-white/25 mt-0.5">Europe/Moscow (UTC+3)</p>
+              </div>
+              <span className="font-mono text-white/70 text-sm">00:00 МСК</span>
+            </div>
           </div>
         </div>
       )}
@@ -1177,14 +945,14 @@ function AdminPage() {
   );
 }
 
-// ─── НАВИГАЦИЯ + LAYOUT ─────────────────────────────────────────────────────
+// ─── LAYOUT ─────────────────────────────────────────────────────────────────
 
-const NAV_ITEMS: { id: Page; label: string; icon: string }[] = [
-  { id: "home", label: "Главная", icon: "Home" },
-  { id: "chat", label: "Чат", icon: "MessageSquare" },
-  { id: "docs", label: "Документация", icon: "Book" },
-  { id: "about", label: "О модели", icon: "Cpu" },
-  { id: "admin", label: "Админ", icon: "Settings" },
+const NAV: { id: Page; label: string; icon: string }[] = [
+  { id: "home",  label: "Главная",       icon: "Home" },
+  { id: "chat",  label: "Чат",           icon: "MessageSquare" },
+  { id: "docs",  label: "Документация",  icon: "Book" },
+  { id: "about", label: "О модели",      icon: "Cpu" },
+  { id: "admin", label: "Админ",         icon: "Settings" },
 ];
 
 export default function Index() {
@@ -1193,52 +961,46 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Navbar */}
-      <header className="fixed top-0 left-0 right-0 z-50 h-[60px] border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="flex items-center h-full px-6 max-w-screen-2xl mx-auto">
-          <button
-            onClick={() => setPage("home")}
-            className="flex items-center gap-2.5 mr-10 flex-shrink-0"
-          >
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center">
-              <Icon name="Zap" size={14} className="text-white" />
-            </div>
-            <span className="font-black font-mono text-base tracking-tight">NEXUS<span className="neon-text-blue">AI</span></span>
+      <header className="fixed top-0 left-0 right-0 z-50 h-14 border-b border-white/[0.06] bg-black/60 backdrop-blur-2xl">
+        <div className="flex items-center h-full px-5 max-w-screen-2xl mx-auto gap-6">
+          <button onClick={() => setPage("home")} className="flex items-center gap-2.5 flex-shrink-0 group">
+            <img src={LOGO_URL} alt="OxiwisAI"
+              className="w-7 h-7 object-contain logo-glow opacity-80 group-hover:opacity-100 transition-opacity" />
+            <span className="font-black font-mono text-sm tracking-tight text-white/80 group-hover:text-white/95 transition-colors">
+              Oxiwis<span className="text-white/40">AI</span>
+            </span>
           </button>
 
-          <nav className="flex items-center gap-1 flex-1">
-            {NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setPage(item.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200
+          <nav className="flex items-center gap-0.5 flex-1">
+            {NAV.map(item => (
+              <button key={item.id} onClick={() => setPage(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
                   ${page === item.id
-                    ? "text-foreground bg-blue-500/10 border border-blue-500/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                  }`}
-              >
-                <Icon name={item.icon} size={13} />
+                    ? "text-white/85 bg-white/[0.07] border border-white/[0.1]"
+                    : "text-white/35 hover:text-white/65 hover:bg-white/[0.04]"
+                  }`}>
+                <Icon name={item.icon} size={12} />
                 {item.label}
               </button>
             ))}
           </nav>
 
-          <div className="flex items-center gap-3 ml-auto">
-            <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-green-500/10 border border-green-500/20">
-              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-xs font-mono text-green-300">online</span>
+          <div className="flex items-center gap-2.5 ml-auto">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.03] border border-white/[0.07]">
+              <div className="w-1.5 h-1.5 rounded-full bg-white/45 animate-pulse" />
+              <span className="text-xs font-mono text-white/30">online</span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-violet-600 flex items-center justify-center border border-blue-500/30">
-              <Icon name="User" size={14} className="text-white" />
+            <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/[0.1] flex items-center justify-center">
+              <Icon name="User" size={13} className="text-white/40" />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Page content */}
-      <main className="pt-[60px]">
-        {page === "home" && <HomePage onNavigate={setPage} />}
-        {page === "chat" && <ChatPage />}
-        {page === "docs" && <DocsPage />}
+      <main className="pt-14">
+        {page === "home"  && <HomePage onNavigate={setPage} />}
+        {page === "chat"  && <ChatPage />}
+        {page === "docs"  && <DocsPage />}
         {page === "about" && <AboutPage />}
         {page === "admin" && <AdminPage />}
       </main>
