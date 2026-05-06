@@ -282,21 +282,56 @@ function ChatPage() {
     if (textRef.current) { textRef.current.style.height = "auto"; }
     setTyping(true);
 
-    setTimeout(() => {
-      const content = generateReply(userMsg.content);
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content,
-        tokens: Math.ceil(content.length / 4),
-        timestamp: new Date(),
-      };
-      setSessions(prev => prev.map(s =>
-        s.id === activeId ? { ...s, messages: [...s.messages, aiMsg] } : s,
-      ));
-      setTyping(false);
-    }, 900 + Math.random() * 800);
-  }, [input, attachments, typing, requestsLeft, activeId]);
+    const currentSession = sessions.find(s => s.id === activeId);
+    const history = [
+      ...(currentSession?.messages ?? []).map(m => ({ role: m.role, content: m.content })),
+      { role: "user" as const, content: userMsg.content },
+    ];
+
+    fetch("https://jpdwcpxlotztzrqcgfeg.supabase.co/functions/v1/v1-chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer ypr_OBqnJxMDLkBWn3IztUOX6dcuW8hH3AfeUHrOAku7X3k",
+      },
+      body: JSON.stringify({ messages: history }),
+    })
+      .then(async res => {
+        const data = await res.json();
+        const content: string =
+          data?.choices?.[0]?.message?.content ??
+          data?.message ??
+          data?.content ??
+          data?.reply ??
+          data?.text ??
+          JSON.stringify(data);
+        const aiMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content,
+          tokens: Math.ceil(content.length / 4),
+          timestamp: new Date(),
+        };
+        setSessions(prev => prev.map(s =>
+          s.id === activeId ? { ...s, messages: [...s.messages, aiMsg] } : s,
+        ));
+      })
+      .catch(() => {
+        const aiMsg: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "Ошибка соединения с сервером. Попробуйте ещё раз.",
+          tokens: 10,
+          timestamp: new Date(),
+        };
+        setSessions(prev => prev.map(s =>
+          s.id === activeId ? { ...s, messages: [...s.messages, aiMsg] } : s,
+        ));
+      })
+      .finally(() => {
+        setTyping(false);
+      });
+  }, [input, attachments, typing, requestsLeft, activeId, sessions]);
 
   const newSession = () => {
     const id = Date.now().toString();
@@ -403,7 +438,7 @@ function ChatPage() {
           </div>
           <div className="ml-auto flex items-center gap-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-white/35 animate-pulse" />
-            <span className="text-[10px] font-mono text-white/25">OxiwisAI</span>
+            <span className="text-[10px] font-mono text-white/25">YAPPERTAR-ai-120b</span>
           </div>
         </div>
 
