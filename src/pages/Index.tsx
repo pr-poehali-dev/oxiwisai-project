@@ -419,7 +419,7 @@ function ChatPage() {
                 Задайте любой вопрос или прикрепите файл
               </p>
               <div className="flex flex-col gap-2 w-full max-w-sm">
-                {["Напиши функцию на Python", "Объясни как работает JWT", "Покажи пример SQL запроса"].map(h => (
+                {["Сгенерируй изображение заката над горами", "Реши задачу: поезд едет 120 км/ч, расстояние 360 км — сколько времени?", "Напиши код парсера RSS на JavaScript"].map(h => (
                   <button key={h} onClick={() => { setInput(h); textRef.current?.focus(); }}
                     className="w-full text-left px-4 py-3 rounded-xl border border-white/[0.07]
                       bg-white/[0.03] text-white/40 text-sm hover:bg-white/[0.06] hover:text-white/60
